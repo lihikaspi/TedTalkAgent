@@ -5,63 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TED Talk Assistant</title>
     <style>
-        /* Mimicking Streamlit styles from your app.py */
-        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; }
-        h1 { color: #e62b1e; } /* TED Red */
-        .chat-box { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); height: 400px; overflow-y: auto; margin-bottom: 20px; }
-        .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; }
-        .user { background: #f0f2f6; text-align: right; margin-left: 20%; }
-        .assistant { background: #e62b1e10; border-left: 4px solid #e62b1e; margin-right: 20%; }
-        .input-area { display: flex; gap: 10px; }
-        input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { background: #e62b1e; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        .info { background: #e7f4ff; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 0.9em; }
+        * { box-sizing: border-box; }
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f9f9f9;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+
+        header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+
+        header h1 {
+            color: #e62b1e;
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            word-wrap: break-word;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: #f0f2f6;
+            color: #1f2937;
+            border-bottom-right-radius: 2px;
+        }
+
+        .assistant {
+            align-self: flex-start;
+            background: #fef2f2;
+            color: #374151;
+            border: 0.5px solid #fecaca; /* Thinner line and lighter shade of red */
+            border-bottom-left-radius: 2px;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #fff;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 12px;
+        }
+
+        input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus { border-color: #e62b1e; }
+
+        button {
+            background: #e62b1e;
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: #cc1a0e; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        .chat-box::-webkit-scrollbar { width: 6px; }
+        .chat-box::-webkit-scrollbar-track { background: transparent; }
+        .chat-box::-webkit-scrollbar-thumb { background: #eee; border-radius: 10px; }
     </style>
 </head>
 <body>
-    <h1>🔴 TED Talk Assistant</h1>
-    <div class="info">I answer questions based strictly on the TED dataset context.</div>
 
-    <div class="chat-box" id="chatBox">
-        <div class="message assistant">Hello! Ask me something about TED talks...</div>
-    </div>
+    <div class="main-container">
+        <header>
+            <h1>TED Talk Assistant</h1>
+        </header>
 
-    <div class="input-area">
-        <input type="text" id="userInput" placeholder="Ask me something about TED talks...">
-        <button onclick="sendMessage()">Send</button>
+        <div class="chat-box" id="chatBox">
+            <div class="message assistant">Hello! I'm your TED expert. Ask me anything about the talks in our dataset!</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Ask about a TED talk topic..." autocomplete="off">
+            <button id="sendBtn" onclick="sendMessage()">Send</button>
+        </div>
     </div>
 
     <script>
         async function sendMessage() {
             const inputField = document.getElementById('userInput');
             const chatBox = document.getElementById('chatBox');
+            const sendBtn = document.getElementById('sendBtn');
             const query = inputField.value.trim();
+
             if (!query) return;
 
-            // Add user message to UI
-            chatBox.innerHTML += `<div class="message user">${query}</div>`;
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'message user';
+            userMsgDiv.textContent = query;
+            chatBox.appendChild(userMsgDiv);
+
             inputField.value = '';
+            inputField.disabled = true;
+            sendBtn.disabled = true;
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // Call your Vercel Python API
-                const response = await fetch('/api/chat', {
+                // IMPORTANT: Fetch using the 'question' key as per API requirements
+                const response = await fetch('/api/prompt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ input: query, session_id: "vercel_session" })
+                    body: JSON.stringify({ question: query })
                 });
+
+                if (!response.ok) throw new Error("Connection failed");
 
                 const data = await response.json();
 
-                // Add assistant response to UI
-                chatBox.innerHTML += `<div class="message assistant">${data.output}</div>`;
+                const assistMsgDiv = document.createElement('div');
+                assistMsgDiv.className = 'message assistant';
+                assistMsgDiv.textContent = data.response;
+                chatBox.appendChild(assistMsgDiv);
+
             } catch (error) {
-                chatBox.innerHTML += `<div class="message assistant" style="color:red">Error: ${error.message}</div>`;
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message assistant';
+                errorDiv.style.color = '#dc2626';
+                errorDiv.textContent = `Error: ${error.message}. Please check your connection.`;
+                chatBox.appendChild(errorDiv);
+            } finally {
+                inputField.disabled = false;
+                sendBtn.disabled = false;
+                inputField.focus();
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Allow 'Enter' key to send
         document.getElementById('userInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
