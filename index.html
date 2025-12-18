@@ -26,19 +26,44 @@
         }
 
         header {
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #eee;
-            text-align: center;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         header h1 {
             color: #e62b1e;
             margin: 0;
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 10px;
+        }
+
+        /* New Chat Button Style */
+        #newChatBtn {
+            background: transparent;
+            color: #e62b1e;
+            border: 1.5px solid #e62b1e;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        #newChatBtn:hover {
+            background: #fef2f2;
+            transform: translateY(-1px);
+        }
+
+        #newChatBtn:active {
+            transform: translateY(0);
         }
 
         .chat-box {
@@ -71,7 +96,7 @@
             align-self: flex-start;
             background: #fef2f2;
             color: #374151;
-            border: 0.5px solid #fecaca; /* Thinner line and lighter shade of red */
+            border: 0.5px solid #fecaca;
             border-bottom-left-radius: 2px;
         }
 
@@ -95,7 +120,7 @@
 
         input:focus { border-color: #e62b1e; }
 
-        button {
+        #sendBtn {
             background: #e62b1e;
             color: white;
             border: none;
@@ -107,8 +132,8 @@
             transition: background 0.2s;
         }
 
-        button:hover { background: #cc1a0e; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
+        #sendBtn:hover { background: #cc1a0e; }
+        #sendBtn:disabled { background: #ccc; cursor: not-allowed; }
 
         .chat-box::-webkit-scrollbar { width: 6px; }
         .chat-box::-webkit-scrollbar-track { background: transparent; }
@@ -119,7 +144,10 @@
 
     <div class="main-container">
         <header>
-            <h1>TED Talk Assistant</h1>
+            <div class="header-content">
+                <h1>TED Talk Assistant</h1>
+                <button id="newChatBtn" onclick="newConversation()">New Chat</button>
+            </div>
         </header>
 
         <div class="chat-box" id="chatBox">
@@ -133,6 +161,19 @@
     </div>
 
     <script>
+        // Generate initial Session ID
+        let sessionId = "session_" + Math.random().toString(36).substring(7);
+
+        function newConversation() {
+            const chatBox = document.getElementById('chatBox');
+            // 1. Clear the UI
+            chatBox.innerHTML = '<div class="message assistant">Hello! I\'m your TED expert. Ask me anything about the talks in our dataset!</div>';
+            // 2. Refresh the Session ID to clear AI memory on backend
+            sessionId = "session_" + Math.random().toString(36).substring(7);
+            // 3. Focus input
+            document.getElementById('userInput').focus();
+        }
+
         async function sendMessage() {
             const inputField = document.getElementById('userInput');
             const chatBox = document.getElementById('chatBox');
@@ -152,11 +193,13 @@
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // IMPORTANT: Fetch using the 'question' key as per API requirements
                 const response = await fetch('/api/prompt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: query })
+                    body: JSON.stringify({
+                        question: query,
+                        session_id: sessionId // Passing session ID to maintain context
+                    })
                 });
 
                 if (!response.ok) throw new Error("Connection failed");
