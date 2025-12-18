@@ -1,0 +1,13 @@
+langchain
+langchain-openai
+langchain-pinecone
+langchain-community
+langchain-core
+langchain-text-splitters
+pandas
+pinecone-client
+fastapi
+uvicorn
+python-dotenv
+pandas
+streamlit
