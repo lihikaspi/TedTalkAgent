@@ -16,7 +16,7 @@ CHAT_MODEL = "RPRTHPB-gpt-5-mini"
 CHUNK_SIZE = 800 # max 2048
 OVERLAP_PERCENT = 0.2 # max 0.3
 EMBED_SIZE = 1536
-TOP_K = 15
+TOP_K = 15 # max 30
 
 # Calculated params
 CHUNK_OVERLAP = int(CHUNK_SIZE * OVERLAP_PERCENT)

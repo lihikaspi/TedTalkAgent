@@ -5,7 +5,7 @@ langchain-community
 langchain-core
 langchain-text-splitters
 pandas
-pinecone-client
+pinecone
 fastapi
 uvicorn
 python-dotenv

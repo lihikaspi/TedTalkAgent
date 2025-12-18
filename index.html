@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TED Talk Assistant</title>
+    <style>
+        /* Mimicking Streamlit styles from your app.py */
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; }
+        h1 { color: #e62b1e; } /* TED Red */
+        .chat-box { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); height: 400px; overflow-y: auto; margin-bottom: 20px; }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; }
+        .user { background: #f0f2f6; text-align: right; margin-left: 20%; }
+        .assistant { background: #e62b1e10; border-left: 4px solid #e62b1e; margin-right: 20%; }
+        .input-area { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background: #e62b1e; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .info { background: #e7f4ff; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>🔴 TED Talk Assistant</h1>
+    <div class="info">I answer questions based strictly on the TED dataset context.</div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="message assistant">Hello! Ask me something about TED talks...</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Ask me something about TED talks...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const inputField = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const query = inputField.value.trim();
+            if (!query) return;
+
+            // Add user message to UI
+            chatBox.innerHTML += `<div class="message user">${query}</div>`;
+            inputField.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                // Call your Vercel Python API
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input: query, session_id: "vercel_session" })
+                });
+
+                const data = await response.json();
+
+                // Add assistant response to UI
+                chatBox.innerHTML += `<div class="message assistant">${data.output}</div>`;
+            } catch (error) {
+                chatBox.innerHTML += `<div class="message assistant" style="color:red">Error: ${error.message}</div>`;
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Allow 'Enter' key to send
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
