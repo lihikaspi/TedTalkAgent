@@ -6,6 +6,7 @@ load_dotenv()
 # Keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PC_API_KEY = os.getenv("PC_API_KEY")
+os.environ["PINECONE_API_KEY"] = PC_API_KEY
 
 # Models
 MODEL_BASE_URL = "https://api.llmod.ai/v1"

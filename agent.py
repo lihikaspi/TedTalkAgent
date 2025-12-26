@@ -38,7 +38,7 @@ def initialize_agent():
         return "\n".join(formatted_docs)
 
     tools = [search_ted_talks]
-    llm = ChatOpenAI(api_key=OPENAI_API_KEY, base_url=MODEL_BASE_URL, model=CHAT_MODEL, temperature=0)
+    llm = ChatOpenAI(api_key=OPENAI_API_KEY, base_url=MODEL_BASE_URL, model=CHAT_MODEL)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
