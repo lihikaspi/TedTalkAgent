@@ -11,103 +11,90 @@ from langchain_pinecone import PineconeVectorStore
 
 
 def get_talk_summary(row):
+    """
+    Summarizes the talk using the LLM.
+    Handles Azure OpenAI Content Safety/Security errors by using the original description as a fallback.
+    """
     llm = ChatOpenAI(
         api_key=OPENAI_API_KEY,
         base_url=MODEL_BASE_URL,
-        model=CHAT_MODEL
+        model=CHAT_MODEL,
+        max_retries=2
     )
 
     prompt = f"""
-    This is a transcript of a TED talk titled "{row['title']}" regarding the topics {row['topics']}:
+    Title: {row['title']}
+    Topics: {row['topics']}
+    Transcript Snippet: {str(row['transcript'])[:8000]}
 
-    {row['transcript']}
-
-    Write one paragraph summarizing the key points of the TED talk using under 200 words.
+    Summarize this TED talk in one paragraph (under 200 words). 
+    Focus on the main thesis and key takeaway.
     """
 
     try:
         response = llm.invoke(prompt)
         return response.content
     except Exception as e:
-        print(f"Error summarizing {row['title']}: {e}")
+        error_str = str(e).lower()
+        # Fallback for Security/Safety filters (common in political/social TED topics)
+        if any(msg in error_str for msg in ["content_filter", "safety", "400", "policy", "security"]):
+            print(f"Safety Filter triggered for '{row['title']}'. Using original description fallback.")
+            # Use original description from dataset as the summary
+            return row.get('description', f"A TED talk titled '{row['title']}' covering {row['topics']}.")
+
+        print(f"Error for {row['title']}: {e}")
         return ""
 
 
 def add_summary_col():
-    """Only summarizes talks that haven't been summarized yet."""
+    """Adds a summary column incrementally to the dataset."""
     target_file = "ted_talks_en_with_summary.csv"
+    if not os.path.exists("ted_talks_en.csv"):
+        print("Error: Source ted_talks_en.csv not found.")
+        return
+
     source_df = pd.read_csv("ted_talks_en.csv")
 
     if os.path.exists(target_file):
         existing_df = pd.read_csv(target_file)
-        # Find IDs that are in source but NOT in existing
-        new_talks = source_df[~source_df['talk_id'].isin(existing_df['talk_id'])]
-
+        new_talks = source_df[~source_df['talk_id'].isin(existing_df['talk_id'])].copy()
         if new_talks.empty:
-            print("All talks in source already have summaries.")
+            print("All summaries are up to date.")
             return
-
-        print(f"Found {len(new_talks)} new talks to summarize.")
+        print(f"Processing {len(new_talks)} new summaries...")
         new_talks["summary"] = new_talks.apply(get_talk_summary, axis=1)
-
-        # Combine and save
-        updated_df = pd.concat([existing_df, new_talks], ignore_index=True)
-        updated_df.to_csv(target_file, index=False)
+        pd.concat([existing_df, new_talks]).to_csv(target_file, index=False)
     else:
-        print("Creating new summary file...")
+        print("Generating initial summaries...")
         source_df["summary"] = source_df.apply(get_talk_summary, axis=1)
         source_df.to_csv(target_file, index=False)
 
-    print(f"Summaries updated in {target_file}")
-
-
-def get_existing_ids_in_pinecone():
-    """
-    Fetches a sample of existing IDs to check if data is already there.
-    Note: For very large datasets, checking 'existence' is better handled
-    by local tracking or the LangChain Indexing API.
-    """
-    pc = Pinecone(api_key=PC_API_KEY)
-    if INDEX_NAME not in pc.list_indexes().names():
-        return set()
-
-    index = pc.Index(INDEX_NAME)
-    stats = index.describe_index_stats()
-    # We use metadata filtering to find which talk_ids are present
-    # However, Pinecone doesn't allow 'list all unique metadata values' easily.
-    # A robust way is keeping a local file 'indexed_talks.txt'
-    if os.path.exists("indexed_talks.txt"):
-        with open("indexed_talks.txt", "r") as f:
-            return set(line.strip() for line in f)
-    return set()
-
 
 def prepare_embeds(exclude_ids=None):
-    """Chunks transcripts, excluding talk_ids that are already indexed."""
+    """
+    Chunks data into 'summary' and 'transcript' types.
+    Summaries help with Goal 1 (Finding a talk) and Goal 2 (Listing 3 talks).
+    Chunks help with Goal 3 (Summarizing ideas) and Goal 4 (Evidence).
+    """
     exclude_ids = exclude_ids or set()
     ted_talks = pd.read_csv("ted_talks_en_with_summary.csv")
 
     # Filter out already processed IDs
-    initial_count = len(ted_talks)
     ted_talks = ted_talks[~ted_talks['talk_id'].astype(str).isin(exclude_ids)]
-    print(f"Processing {len(ted_talks)} talks (Skipped {initial_count - len(ted_talks)} already indexed).")
+    print(f"Processing {len(ted_talks)} talks...")
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
-        add_start_index=True,
-        separators=["\n\n", "\n", ".", " ", ""]
+        add_start_index=True
     )
 
     all_docs = []
-    processed_ids_this_run = []
+    processed_ids = []
 
     for _, row in ted_talks.iterrows():
         t_id = str(row["talk_id"])
-        transcript = str(row.get("transcript", ""))
-        summary = str(row.get("summary", ""))
-
-        base_metadata = {
+        base_meta = {
             "talk_id": t_id,
             "title": row["title"],
             "speaker": row["speaker_1"],
@@ -115,84 +102,68 @@ def prepare_embeds(exclude_ids=None):
             "topics": row["topics"]
         }
 
-        # Summary doc
+        # 1. Store the High-Level Summary (Supports Goal 1 and Goal 2)
+        summary_text = str(row.get("summary", ""))
         all_docs.append(Document(
-            page_content=f"TED Talk Summary: {row['title']}\n\n{summary}",
-            metadata={**base_metadata, "content_type": "summary"}
+            page_content=f"TED TALK OVERVIEW\nTitle: {row['title']}\nSpeaker: {row['speaker_1']}\nSummary: {summary_text}",
+            metadata={**base_meta, "content_type": "summary"}
         ))
 
-        # Transcript chunks
+        # 2. Store Transcript Chunks (Supports Goal 3 and Goal 4)
+        transcript = str(row.get("transcript", ""))
         chunks = text_splitter.split_text(transcript)
-        for i, chunk_text in enumerate(chunks):
-            contextualized_text = f"Talk: {row['title']}\nSpeaker: {row['speaker_1']}\nContext: {summary[:150]}...\n\nTranscript Snippet: {chunk_text}"
+        for i, chunk in enumerate(chunks):
+            # We inject the title and speaker into every chunk to ensure retrieval context is clear
+            contextualized_chunk = f"TALK: {row['title']} by {row['speaker_1']}\nTRANSCRIPT SNIPPET: {chunk}"
             all_docs.append(Document(
-                page_content=contextualized_text,
-                metadata={**base_metadata, "content_type": "transcript_chunk", "chunk_id": i}
+                page_content=contextualized_chunk,
+                metadata={**base_meta, "content_type": "transcript", "chunk_id": i}
             ))
 
-        processed_ids_this_run.append(t_id)
+        processed_ids.append(t_id)
 
-    return all_docs, processed_ids_this_run
+    return all_docs, processed_ids
 
 
 def sync_to_pinecone(documents, embeddings, processed_ids):
-    if not documents:
-        print("No new documents to upload.")
-        return None
-
+    if not documents: return
     pc = Pinecone(api_key=PC_API_KEY)
 
     if INDEX_NAME not in pc.list_indexes().names():
-        print(f"Creating index '{INDEX_NAME}'...")
         pc.create_index(
-            name=INDEX_NAME,
-            dimension=EMBED_SIZE,
-            metric="cosine",
+            name=INDEX_NAME, dimension=EMBED_SIZE, metric="cosine",
             spec=ServerlessSpec(cloud="aws", region="us-east-1")
         )
+        while not pc.describe_index(INDEX_NAME).status['ready']: time.sleep(1)
 
-        while not pc.describe_index(INDEX_NAME).status['ready']:
-            time.sleep(1)
-            print("Waiting for index to initialize...")
-
-    print(f"Uploading {len(documents)} documents to Pinecone index '{INDEX_NAME}'...")
-
-    vectorstore = PineconeVectorStore.from_documents(
-        documents=documents,
-        index_name=INDEX_NAME,
-        embedding=embeddings,
-        pinecone_api_key=PC_API_KEY
+    PineconeVectorStore.from_documents(
+        documents=documents, index_name=INDEX_NAME,
+        embedding=embeddings, pinecone_api_key=PC_API_KEY
     )
 
-    # Update local tracking file
     with open("indexed_talks.txt", "a") as f:
-        for t_id in processed_ids:
-            f.write(f"{t_id}\n")
-
-    return vectorstore
+        for t_id in processed_ids: f.write(f"{t_id}\n")
 
 
 def main():
-    # 1. Update summaries (incremental)
     add_summary_col()
 
-    # 2. Check what's already in Pinecone (via local manifest)
-    existing_ids = get_existing_ids_in_pinecone()
+    indexed_file = "indexed_talks.txt"
+    existing_ids = set()
+    if os.path.exists(indexed_file):
+        with open(indexed_file, "r") as f:
+            existing_ids = {line.strip() for line in f}
 
-    # 3. Prepare only new docs
-    documents, new_ids = prepare_embeds(exclude_ids=existing_ids)
+    docs, new_ids = prepare_embeds(exclude_ids=existing_ids)
 
-    # 4. Embed and Sync
-    if documents:
+    if docs:
         embeddings = OpenAIEmbeddings(
-            api_key=OPENAI_API_KEY,
-            base_url=MODEL_BASE_URL,
-            model=EMBED_MODEL
+            api_key=OPENAI_API_KEY, base_url=MODEL_BASE_URL, model=EMBED_MODEL
         )
-        sync_to_pinecone(documents, embeddings, new_ids)
-        print("Sync complete.")
+        sync_to_pinecone(docs, embeddings, new_ids)
+        print("Success: New talks indexed.")
     else:
-        print("Everything is already up to date.")
+        print("No new content to index.")
 
 
 if __name__ == "__main__":
