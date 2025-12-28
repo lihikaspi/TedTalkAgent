@@ -45,7 +45,6 @@
             gap: 10px;
         }
 
-        /* New Chat Button Style */
         #newChatBtn {
             background: transparent;
             color: #e62b1e;
@@ -55,15 +54,12 @@
             font-size: 0.85rem;
             font-weight: 600;
             transition: all 0.2s;
+            cursor: pointer;
         }
 
         #newChatBtn:hover {
             background: #fef2f2;
             transform: translateY(-1px);
-        }
-
-        #newChatBtn:active {
-            transform: translateY(0);
         }
 
         .chat-box {
@@ -82,6 +78,8 @@
             border-radius: 12px;
             line-height: 1.5;
             font-size: 0.95rem;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
             word-wrap: break-word;
         }
 
@@ -106,30 +104,40 @@
             border-top: 1px solid #eee;
             display: flex;
             gap: 12px;
+            align-items: flex-end;
         }
 
-        input {
+        /* Updated to handle multi-line text input */
+        textarea {
             flex-grow: 1;
             padding: 12px 18px;
             border: 1px solid #ddd;
-            border-radius: 25px;
+            border-radius: 20px;
             outline: none;
             font-size: 1rem;
+            font-family: inherit;
             transition: border-color 0.2s;
+            resize: none;
+            max-height: 200px;
+            min-height: 48px;
+            overflow-y: auto;
+            line-height: 1.4;
         }
 
-        input:focus { border-color: #e62b1e; }
+        textarea:focus { border-color: #e62b1e; }
 
         #sendBtn {
             background: #e62b1e;
             color: white;
             border: none;
+            height: 48px;
             padding: 0 25px;
             border-radius: 25px;
             cursor: pointer;
             font-weight: bold;
             font-size: 0.9rem;
             transition: background 0.2s;
+            flex-shrink: 0;
         }
 
         #sendBtn:hover { background: #cc1a0e; }
@@ -155,23 +163,28 @@
         </div>
 
         <div class="input-area">
-            <input type="text" id="userInput" placeholder="Ask about a TED talk topic..." autocomplete="off">
+            <textarea id="userInput" placeholder="Ask about a TED talk topic..." rows="1" oninput="autoResize(this)"></textarea>
             <button id="sendBtn" onclick="sendMessage()">Send</button>
         </div>
     </div>
 
     <script>
-        // Generate initial Session ID
         let sessionId = "session_" + Math.random().toString(36).substring(7);
+
+        // Function to automatically resize the textarea based on content
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
 
         function newConversation() {
             const chatBox = document.getElementById('chatBox');
-            // 1. Clear the UI
             chatBox.innerHTML = '<div class="message assistant">Hello! I\'m your TED expert. Ask me anything about the talks in our dataset!</div>';
-            // 2. Refresh the Session ID to clear AI memory on backend
             sessionId = "session_" + Math.random().toString(36).substring(7);
-            // 3. Focus input
-            document.getElementById('userInput').focus();
+            const inputField = document.getElementById('userInput');
+            inputField.value = '';
+            inputField.style.height = 'auto';
+            inputField.focus();
         }
 
         async function sendMessage() {
@@ -188,6 +201,7 @@
             chatBox.appendChild(userMsgDiv);
 
             inputField.value = '';
+            inputField.style.height = 'auto'; // Reset height after sending
             inputField.disabled = true;
             sendBtn.disabled = true;
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -198,7 +212,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         question: query,
-                        session_id: sessionId // Passing session ID to maintain context
+                        session_id: sessionId
                     })
                 });
 
@@ -225,8 +239,12 @@
             }
         }
 
-        document.getElementById('userInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+        // Allow Enter to send, but Shift+Enter for new line
+        document.getElementById('userInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
         });
     </script>
 </body>
