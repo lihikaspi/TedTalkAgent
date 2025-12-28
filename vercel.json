@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
   "api/main.py": {
-    "runtime": "python",
+    "runtime": "@vercel/python",
     "excludeFiles": "{.venv/**,talk_indexer.py,summary_generator.py,app.py}"
   }
   },
