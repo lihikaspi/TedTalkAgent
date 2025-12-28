@@ -1,21 +1,4 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/main.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    }
-  ],
-  "functions": {
-    "api/main.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{.venv/**,talk_indexer.py,summary_generator.py,app.py}"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
