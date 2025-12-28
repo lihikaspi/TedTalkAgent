@@ -1,12 +1,19 @@
 {
+  "version": 2,
+  "functions": {
+  "api/main.py": {
+    "runtime": "python@3.9",
+    "excludeFiles": "{.venv/**,talk_indexer.py,summary_generator.py,app.py}"
+  }
+  },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "api/main.py"
+    "source": "/api/(.*)",
+    "destination": "api/main.py"
     },
     {
-      "source": "/",
-      "destination": "/index.html"
+    "source": "/",
+    "destination": "/index.html"
     }
   ]
 }

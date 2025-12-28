@@ -5,10 +5,7 @@ langchain-community
 langchain-core
 langchain-text-splitters
 langchain-classic
-pandas
 pinecone
 fastapi
 uvicorn
 python-dotenv
-pandas
-streamlit
